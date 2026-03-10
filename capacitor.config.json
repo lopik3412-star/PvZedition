@@ -1,0 +1,6 @@
+{
+  "appId": "com.ripezz.pvz",
+  "appName": "PvZ Ripezz",
+  "webDir": ".",
+  "bundledWebRuntime": false
+}

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PvZ Ripezz - v0.07.1 Full</title>
+    <style>
+        @import url('https://fonts.googleapis.com');
+        * { margin: 0; padding: 0; user-select: none; touch-action: none; font-family: 'Arial Black', sans-serif; }
+        body { background: #050505; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; width: 100vw; }
+        #menu, #chapters, #settings { position: absolute; width: 100%; height: 100%; background: radial-gradient(circle, #1a237e 0%, #000 100%); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
+        .tombstone { background: linear-gradient(145deg, #78909c, #37474f); border: 6px solid #263238; border-radius: 120px 120px 30px 30px; padding: 60px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 30px 80px rgba(0,0,0,1); border-bottom: 25px solid #1a252b; }
+        h1.menu-title { font-family: 'Luckiest Guy', cursive; color: #cddc39; font-size: 90px; letter-spacing: 4px; text-shadow: 6px 6px 0 #33691E, 10px 10px 20px rgba(0,0,0,0.8); margin-bottom: 40px; transform: rotate(-2deg); }
+        .btn { width: 320px; padding: 22px; margin: 15px; font-size: 26px; text-align: center; cursor: pointer; background: linear-gradient(#a1887f, #4e342e); color: #000; border: 5px solid #2e1a10; border-radius: 20px; font-weight: 900; box-shadow: 0 8px 0 #1b100a, 0 10px 20px rgba(0,0,0,0.5); transition: 0.1s; }
+        .btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #1b100a; }
+        .chapters-wrapper { display: flex; gap: 30px; padding: 40px; overflow-x: auto; width: 90%; }
+        .chapter-card { min-width: 220px; height: 280px; border: 8px solid #2e1a10; border-radius: 25px; display: flex; flex-direction: column; align-items: center; justify-content: space-around; padding: 15px; cursor: pointer; flex-shrink: 0; }
+        .ch-open { background: linear-gradient(#43A047, #1B5E20); color: #eeff41; }
+        .ch-locked { background: #424242; color: #888; border-color: #222; cursor: default; filter: grayscale(1); opacity: 0.7; }
+        .pot-settings { position: absolute; bottom: 30px; left: 30px; width: 95px; height: 95px; background: linear-gradient(#FF7043, #D84315); border-radius: 15px 15px 55px 55px; border: 6px solid #8e2a09; cursor: pointer; display: flex; justify-content: center; align-items: center; font-size: 14px; font-weight: bold; color: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+        .version-tag { position: absolute; bottom: 15px; left: 15px; color: rgba(255,255,255,0.3); font-size: 16px; }
+        canvas { background: #1b5e20; display: none; border: 10px solid #2e7d32; touch-action: none; }
+    </style>
+</head>
+<body>
+<div id="loading" style="position:absolute;width:100%;height:100%;background:#000;display:flex;justify-content:center;align-items:center;z-index:500;">
+    <h1 id="loading-text" style="color:#eeff41;font-size:70px;">ЗАГРУЗКА...</h1>
+</div>
+<div id="menu">
+    <div class="tombstone">
+        <h1 class="menu-title">ADVENTURE</h1>
+        <div class="btn" onclick="playSound('click'); openChapters()">ИГРАТЬ</div>
+        <div class="btn" onclick="playSound('click'); alert('Скоро!')">АЛЬМАНАХ</div>
+        <div class="btn" style="color:#b71c1c;" onclick="location.reload()">ВЫХОД</div>
+    </div>
+    <div class="pot-settings" onclick="playSound('click'); openSettings()">⚙️ НАСТР</div>
+    <div class="version-tag">v0.07.1</div>
+</div>
+<div id="chapters">
+    <h1 style="color:#eeff41; font-size: 50px; margin-bottom: 20px; text-shadow: 4px 4px #000;">ВЫБОР ГЛАВЫ</h1>
+    <div class="chapters-wrapper">
+        <div class="chapter-card ch-open" onclick="playSound('click'); start()"><div>ГЛАВА 1</div><div style="font-size: 60px;">☀️</div><div>ДЕНЬ</div></div>
+        <div class="chapter-card ch-locked"><div>ГЛАВА 2</div><div style="font-size: 60px;">🌙</div><div>ЗАКРЫТО</div></div>
+    </div>
+
+<div class="btn" onclick="playSound('click'); closeScreens()">НАЗАД</div>
+</div>
+<div id="settings">
+    <h2 style="font-size:40px; margin-bottom:30px; color:#fff;">SETTINGS</h2>
+    <div class="btn" onclick="playSound('click'); setLang('ru')">РУССКИЙ</div>
+    <div class="btn" onclick="playSound('click'); setLang('en')">ENGLISH</div>
+    <div class="btn" id="btn-sound-toggle" onclick="toggleSound()">SOUND: ON</div>
+    <div class="btn" id="btn-hp-toggle" onclick="toggleHP()">HP: OFF</div>
+    <div class="btn" style="margin-top:30px;" onclick="playSound('click'); closeScreens()">BACK</div>
+</div>
+<canvas id="game"></canvas>
+<script>
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let soundEnabled = localStorage.getItem('ripezz_sound') !== 'false';
+    function playSound(type) {
+        if (!soundEnabled) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        if (type === 'click') { osc.frequency.setValueAtTime(400, audioCtx.currentTime); gain.gain.setValueAtTime(0.1, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.1); }
+        else if (type === 'sun') { osc.type = 'triangle'; osc.frequency.setValueAtTime(900, audioCtx.currentTime); gain.gain.setValueAtTime(0.05, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.2); }
+        else if (type === 'chomp') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(160, audioCtx.currentTime); gain.gain.setValueAtTime(0.03, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.05); }
+        else if (type === 'boom') { osc.type = 'sine'; osc.frequency.setValueAtTime(80, audioCtx.currentTime); gain.gain.setValueAtTime(0.4, audioCtx.currentTime); osc.start(); osc.stop(audioCtx.currentTime + 0.3); }
+    }
+    const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+    let lang = 'ru', showHP = localStorage.getItem('ripezz_hp') === 'true';
+    const TXT = { ru: { exit: "ВЫХОД", hp: "HP: ", sound: "ЗВУК: ", load: "ЗАГРУЗКА...", wave: "ЗОМБИ БЛИЗКО!" }, en: { exit: "EXIT", hp: "HP: ", sound: "SOUND: ", load: "LOADING...", wave: "WAVE COMING!" } };
+    canvas.width = 1100; canvas.height = 750;
+    const ROWS = 5, COLS = 9, CELL_W = 110, CELL_H = 115, OFF_X = 80, OFF_Y = 150;
+    let level = parseInt(localStorage.getItem('ripezz_level')) || 1;
+    let playing = false, suns = 300, selected = 'pea', shovel = false, plants = [], zombies = [], peas = [], drops = [], mowers = [], explosions = [], fallingHelmets = [], killed = 0, total = 10 + (level * 3), lastSpawn = 0, lastSkySun = 0;
+    const DATA = { pea: { p: 100, cd: 5000, last: 0, hp: 300 }, sun: { p: 50, cd: 5000, last: 0, hp: 300 }, nut: { p: 50, cd: 15000, last: 0, hp: 2000 }, cherry: { p: 150, cd: 25000, last: 0, hp: 300 }, snow: { p: 175, cd: 10000, last: 0, hp: 300 }, mine: { p: 25, cd: 15000, last: 0, hp: 300 } };
+    function toggleHP() { showHP = !showHP; localStorage.setItem('ripezz_hp', showHP); playSound('click'); updateUI(); }
+    function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('ripezz_sound', soundEnabled); playSound('click'); updateUI(); }
+    function updateUI() { document.getElementById('btn-hp-toggle').innerText = TXT[lang].hp + (showHP ? "ON" : "OFF"); document.getElementById('btn-sound-toggle').innerText = TXT[lang].sound + (soundEnabled ? "ON" : "OFF"); }
+    function setLang(l) { lang = l; updateUI(); document.getElementById('loading-text').innerText = TXT[lang].load; }
+    function openChapters() { document.getElementById('menu').style.display='none'; document.getElementById('chapters').style.display='flex'; }
+    function openSettings() { document.getElementById('menu').style.display='none'; document.getElementById('settings').style.display='flex'; }
+    function closeScreens() { document.querySelectorAll('#settings,#chapters').forEach(e=>e.style.display='none'); document.getElementById('menu').style.
+
+display='flex'; }
+    function initMowers() { mowers = []; for(let i=0; i<ROWS; i++) mowers.push({x: 5, y: i*CELL_H+OFF_Y+20, r: i, active: true, moving: false}); }
+    function drawEnt(c, type, x, y, opt = {}) {
+        c.save(); c.translate(x + 55, y + 55); if (opt.hit > 0) c.filter = "brightness(3)";
+        if (type === 'pea' || type === 'snow') {
+            c.fillStyle = "#1B5E20"; c.beginPath(); c.ellipse(-25, 25, 15, 8, Math.PI/4, 0, Math.PI*2); c.fill();
+            c.fillStyle = type === 'snow' ? "#0288D1" : "#76FF03"; c.beginPath(); c.arc(0,0,34,0,Math.PI*2); c.fill();
+            c.fillStyle = type === 'snow' ? "#01579B" : "#33691E"; c.fillRect(18,-15,28,30);
+            c.fillStyle="white"; c.beginPath(); c.arc(10,-10,10,0,Math.PI*2); c.fill(); c.fillStyle="black"; c.beginPath(); c.arc(13,-10,4,0,Math.PI*2); c.fill();
+        } else if (type === 'sun_plant') {
+            c.fillStyle = "#388E3C"; c.fillRect(-5, 10, 10, 40); c.fillStyle = "#FFB300"; for(let i=0; i<10; i++){ c.rotate(Math.PI/5); c.beginPath(); c.ellipse(30, 0, 18, 10, 0, 0, Math.PI*2); c.fill(); }
+            c.fillStyle = "#5D4037"; c.beginPath(); c.arc(0,0,24,0,Math.PI*2); c.fill(); c.fillStyle="black"; c.beginPath(); c.arc(-8,-4,3,0,Math.PI*2); c.arc(8,-4,3,0,Math.PI*2); c.fill();
+        } else if (type === 'sun_drop') {
+            c.shadowBlur = 15; c.shadowColor = "yellow"; c.fillStyle = "#FFEB3B"; for(let i=0; i<12; i++){ c.rotate(Math.PI/6); c.fillRect(25,-7,20,14); }
+            c.beginPath(); c.arc(0,0,28,0,Math.PI*2); c.fill();
+        } else if (type === 'nut') {
+            c.fillStyle = "#8D6E63"; c.beginPath(); c.ellipse(0,0,42,52,0,0,Math.PI*2); c.fill();
+            c.fillStyle="white"; c.beginPath(); c.arc(-15,-18,11,0,Math.PI*2); c.arc(15,-18,11,0,Math.PI*2); c.fill();
+            c.fillStyle="black"; c.beginPath(); c.arc(-13,-18,4,0,Math.PI*2); c.arc(17,-18,4,0,Math.PI*2); c.fill();
+        } else if (type === 'mine') {
+            c.fillStyle="#795548"; c.beginPath(); c.ellipse(0, 20, 35, 15, 0, 0, Math.PI*2); c.fill();
+            if(opt.ready){ c.fillStyle="#A1887F"; c.beginPath(); c.arc(0,-10,25,0,Math.PI*2); c.fill(); c.fillStyle="red"; c.beginPath(); c.arc(0,-30,6,0,Math.PI*2); c.fill(); }
+            else { c.fillStyle="#5D4037"; c.beginPath(); c.arc(0,10,20,0,Math.PI*2); c.fill(); }
+        } else if (type === 'cherry') {
+            [-22, 22].forEach(sx => { c.strokeStyle = "#2E7D32"; c.lineWidth = 5; c.beginPath(); c.moveTo(sx, 10); c.quadraticCurveTo(0, -30, 0, -50); c.stroke(); c.fillStyle="#d32f2f"; c.beginPath(); c.arc(sx, 15, 26, 0, Math.PI*2); c.fill(); });
+        } else if (type === 'zombie') {
+            c.fillStyle = opt.s ? "#4FC3F7" : "#5D4037"; c.fillRect(-22,-10,44,75); c.fillStyle = opt.s ? "#81D4FA" : "#90A4AE"; c.beginPath(); c.arc(0,-40,30,0,Math.PI*2); c.fill();
+            c.fillStyle="white"; c.beginPath(); c.arc(-10,-45,10,0,Math.PI*2); c.arc(12,-42,7,0,Math.PI*2); c.fill(); c.fillStyle="black"; c.beginPath(); c.arc(-8,-45,4,0,Math.PI*2); c.arc(13,-42,2,0,Math.PI*2); c.fill();
+            if (opt.h === 'bucket') { c.fillStyle="#B0BEC5"; c.fillRect(-35,-95,70,55); } else if (opt.h === 'cone') { c.fillStyle="#FF6D00"; c.beginPath(); c.moveTo(-35,-40); c.lineTo(0,-105); c.lineTo(35,-40); c.fill(); }
+        }
+        c.restore(); if (showHP && opt.hpMax) { ctx.fillStyle="white"; ctx.font="bold 16px Arial"; ctx.textAlign="center"; ctx.fillText(Math.ceil(opt.hp)+"/"+opt.hpMax, x+55, y-10); }
+    }
+    function handleInput(e) {
+        if (!playing) return; const rect = canvas.getBoundingClientRect();
+        const clientX = (e.touches ? e.touches[0].clientX : e.clientX), clientY = (e.touches ? e.touches[0].clientY : e.clientY);
+        const x = (clientX-rect.left)*(canvas.width/rect.width), y = (clientY-rect.top)*(canvas.height/rect.height);
+
+        if (x > 960 && y < 70) { playSound('click'); playing=false; canvas.style.display='none'; closeScreens(); return; }
+        for (let i = drops.length - 1; i >= 0; i--) if (Math.hypot(x - drops[i].x, y - drops[i].y) < 65) { playSound('sun'); drops[i].
+
+collecting = true; return; }
+        if (y < 140) { if (x < 110) { playSound('click'); shovel = !shovel; selected = null; return; } const keys = Object.keys(DATA); const idx = Math.floor((x - 120) / 105); if (idx >= 0 && idx < keys.length) { playSound('click'); selected = keys[idx]; shovel = false; } return; }
+        const c = Math.floor((x - OFF_X) / CELL_W), r = Math.floor((y - OFF_Y) / CELL_H);
+        if (c >= 0 && c < COLS && r >= 0 && r < ROWS) {
+            if (shovel) { playSound('click'); plants = plants.filter(p => !(p.c === c && p.r === r)); shovel = false; }
+            else if (selected && suns >= DATA[selected].p && Date.now() - DATA[selected].last > DATA[selected].cd) { if (!plants.some(p => p.c === c && p.r === r)) { playSound('click'); suns -= DATA[selected].p; DATA[selected].last = Date.now(); plants.push({c, r, x: c*CELL_W+OFF_X, y: r*CELL_H+OFF_Y, type: selected, hp: DATA[selected].hp, hpMax: DATA[selected].hp, t: 0}); if(selected==='cherry') setTimeout(()=>explode(c,r), 800); } }
+        }
+    }
+    function explode(c, r) { playSound('boom'); explosions.push({x: c*CELL_W+OFF_X+55, y: r*CELL_H+OFF_Y+55, r: 0}); plants = plants.filter(p => !(p.c === c && p.r === r)); zombies.forEach(z => { if(Math.abs(z.r-r)<=1 && Math.abs((z.x-(c*CELL_W+OFF_X))/CELL_W)<2) { if(z.h) fallingHelmets.push({x:z.x, y:z.y, type:z.h, vx:4, vy:-10, rot:0}); z.hp=-1; killed++; } }); }
+    function loop(t) {
+        if (!playing) return; ctx.clearRect(0,0,canvas.width,canvas.height);
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { ctx.fillStyle = (r+c)%2===0 ? "#43A047":"#388E3C"; ctx.fillRect(c*CELL_W+OFF_X, r*CELL_H+OFF_Y, CELL_W, CELL_H); }
+        if (t - lastSkySun > 8000) { drops.push({x: Math.random()*800+100, y: -50, targetY: Math.random()*400+200, t: 0, sky: true, collecting: false}); lastSkySun = t; }
+        ctx.fillStyle = "#3e2723"; ctx.fillRect(0,0,canvas.width, 140);
+        ctx.fillStyle = shovel ? "#ff5252" : "#5D4037"; ctx.fillRect(10,10,100,120);
+        ctx.fillStyle="#B0BEC5"; ctx.fillRect(40,30,35,25); ctx.fillStyle="#8D6E63"; ctx.fillRect(55,45,8,60);
+        Object.keys(DATA).forEach((key, i) => {
+            let x = 120 + i*105; let cd = Math.min(1, (Date.now() - DATA[key].last) / DATA[key].cd); ctx.fillStyle = selected === key ? "#fff59d" : "#6D4C41"; ctx.fillRect(x, 10, 95, 120);
+            if (cd < 1) { ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(x, 10, 95, 120*(1-cd)); } ctx.save(); ctx.translate(x-5, 15); ctx.scale(0.6,0.6); drawEnt(ctx, key==='sun'?'sun_plant':key, 0, 0); ctx.restore();
+            ctx.fillStyle="#FFEB3B"; ctx.font="14px Arial"; ctx.fillText(DATA[key].p, x+35, 125);
+        });
+        ctx.fillStyle="#FFEB3B"; ctx.font="bold 30px Arial"; ctx.fillText("☀️ " + suns, 820, 85);
+        ctx.fillStyle="#9e9e9e"; ctx.fillRect(960, 15, 120, 50); ctx.fillStyle="#333"; ctx.font="bold 20px Arial"; ctx.fillText(TXT[lang].exit, 980, 48);
+        ctx.fillStyle="white"; ctx.font="bold 16px Arial"; ctx.fillText(TXT[lang].wave, 20, 690); ctx.fillStyle="#333"; ctx.fillRect(20, 700, 300, 30); ctx.fillStyle="#76FF03"; ctx.fillRect(20, 700, (killed/total)*300, 30);
+        mowers.forEach(m => {
+            if (!m.active) return; ctx.save(); ctx.translate(m.x, m.y); ctx.fillStyle="#e53935"; ctx.fillRect(0,10,75,35); ctx.fillStyle="#b71c1c"; ctx.fillRect(15,0,45,15); ctx.fillStyle="#212121"; ctx.beginPath(); ctx.arc(15,35,10,0,Math.PI*2); ctx.arc(60,35,10,0,Math.PI*2); ctx.fill(); ctx.restore();
+            if (m.moving) { m.x += 14; zombies.forEach(z => { if(z.r===m.r && z.x < m.x+75) { z.hp=-1; killed++; } }); if(m.x > 1100) m.active=false; }
+
+        });
+        if (t-lastSpawn > 5000 && killed < total) {
+            let r = Math.floor(Math.random()*ROWS), rnd = Math.random(), type = rnd > 0.8 ? 'bucket' : (rnd > 0.5 ? 'cone' : null), hp = type==='bucket'?1100:(type==='cone'?560:190);
+            zombies.push({x: 1100, y: r*CELL_H+OFF_Y, r, hp: hp, hpMax: hp, h: type, s: 0, hit: 0}); lastSpawn = t;
+        }
+        fallingHelmets.forEach((h, i) => { h.x += h.vx; h.y += h.
+
+vy; h.vy += 0.6; h.rot += 0.2; ctx.save(); ctx.translate(h.x+30, h.y+30); ctx.rotate(h.rot); if(h.type==='bucket') { ctx.fillStyle="#B0BEC5"; ctx.fillRect(-25,-20,50,40); } else { ctx.fillStyle="#FF6D00"; ctx.beginPath(); ctx.moveTo(-25,20); ctx.lineTo(0,-30); ctx.lineTo(25,20); ctx.fill(); } ctx.restore(); if(h.y > 800) fallingHelmets.splice(i,1); });
+        plants.forEach((p, idx) => { drawEnt(ctx, p.type==='sun'?'sun_plant':p.type, p.x, p.y, {hp: p.hp, hpMax: p.hpMax, ready: p.t > 600}); p.t++; if ((p.type==='pea'||p.type==='snow') && p.t%90===0 && zombies.some(z=>z.r===p.r&&z.x>p.x)) peas.push({x:p.x+85, y:p.y+40, r:p.r, type:p.type}); if (p.type==='sun' && p.t%450===0) drops.push({x:p.x+50, y:p.y+50, t:0, sky: false, collecting: false}); if (p.hp<=0) plants.splice(idx,1); });
+        zombies.forEach(z => {
+            let target = plants.find(p=>p.r===z.r && z.x<p.x+75 && z.x>p.x-10);
+            if (target) { if (target.type === 'mine' && target.t > 600) { explode(target.c, target.r); } else { target.hp -= 2.5; if(Date.now()%240 < 30) playSound('chomp'); } } else { z.x -= (z.s>0?0.35:0.65); }
+            if (z.h && z.hp <= 190) { fallingHelmets.push({x:z.x, y:z.y, type:z.h, vx:3, vy:-8, rot:0}); z.h = null; } if (z.hit > 0) z.hit--;
+            drawEnt(ctx, 'zombie', z.x, z.y, {h:z.h, s:z.s>0, hp: z.hp, hpMax: z.hpMax, hit: z.hit});
+            if (z.x<70) { let m=mowers.find(mw=>mw.r===z.r && mw.active); if(m) m.moving=true; else { alert("ЗОМБИ СЪЕЛИ МОЗГИ!"); location.reload(); } }
+        });
+        peas.forEach((pea, i) => { pea.x += 12; ctx.fillStyle = pea.type==='snow'?"#81D4FA":"#AEEA00"; ctx.beginPath(); ctx.arc(pea.x, pea.y, 11, 0, Math.PI*2); ctx.fill(); zombies.forEach(z => { if(z.r===pea.r && pea.x>z.x && pea.x<z.x+60) { z.hp-=20; z.hit=5; if(pea.type==='snow') z.s=150; peas.splice(i,1); if(z.hp<=0) killed++; } }); });
+        drops.forEach((s, i) => { if (s.collecting) { s.x += (820-s.x)*0.2; s.y += (85-s.y)*0.2; if(Math.hypot(s.x-820, s.y-85)<20){ suns+=25; drops.splice(i,1); } } else { if(s.sky && s.y<s.targetY) s.y+=2.5; s.t++; if(s.t>600) drops.splice(i,1); } drawEnt(ctx, 'sun_drop', s.x-55, s.y-55); });
+        explosions.forEach((ex, i) => { ctx.fillStyle="rgba(255,100,0,0.7)"; ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI*2); ctx.fill(); ex.r+=12; if(ex.r>160) explosions.splice(i,1); });
+        zombies = zombies.filter(z => z.hp > 0); if (killed >= total && zombies.length === 0) { level++; localStorage.setItem('ripezz_level', level); alert("ПОБЕДА!"); location.reload(); } requestAnimationFrame(loop);
+    }
+    function start() { document.getElementById('chapters').style.display='none'; canvas.style.display='block'; playing=true; initMowers(); requestAnimationFrame(loop); }
+    canvas.addEventListener('mousedown', handleInput); canvas.addEventListener('touchstart', (e) => { e.preventDefault(); handleInput(e); });
+    window.addEventListener('resize', () => { const ratio = 1100/750; let w = window.innerWidth, h = window.innerHeight; if (w/h > ratio) w = h*ratio; else h = w/ratio; canvas.style.width = w+'px'; canvas.style.height = h+'px'; });
+    window.dispatchEvent(new Event('resize')); setTimeout(() => { document.getElementById('loading').style.display='none'; document.getElementById('menu').style.display='flex'; setLang('ru'); }, 1000);
+</script>
+</body>
+</html>
